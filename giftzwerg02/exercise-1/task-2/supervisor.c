@@ -28,7 +28,12 @@ void error(char *scope) {
 char* read_solution(int *pos, struct edge_buffer *buf, sem_t *free, sem_t *used) {
 	printf("trying to read\n");
 	sem_wait(used);
-	char *res = buf->data[*pos];
+	printf("reading pos = %d\n", *pos);
+	if(msync(buf, sizeof(struct edge_buffer), MS_SYNC) != 0) {
+		error("msync");
+	}
+	char *res = buf->data[0];
+	// char *res = "a";
 	sem_post(free);
 	*pos += 1;
 	*pos %= sizeof(buf->data);

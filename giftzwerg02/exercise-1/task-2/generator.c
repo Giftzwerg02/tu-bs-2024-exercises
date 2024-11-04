@@ -22,18 +22,23 @@ struct edge_buffer {
 	char* data[MAX_DATA];
 };
 
+void error(char* scope) {
+	perror(scope);
+}
+
 void write_solution(int *pos, struct edge_buffer *buf, char* val, sem_t *free, sem_t *used) {
 	printf("Trying to write...\n");
 	sem_wait(free);
-	buf->data[*pos] = val;
+	printf("write to pos = %d\n", *pos);
+	buf->data[0] = "abc";
+	if(msync(buf, sizeof(struct edge_buffer), MS_SYNC) != 0) {
+		error("msync");
+	}
+	printf("i just wrote: %s\n", buf->data[*pos]);
 	sem_post(used);
 	*pos += 1;
 	*pos %= sizeof(buf->data);
 	printf("done writing\n");
-}
-
-void error(char* scope) {
-	perror(scope);
 }
 
 int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
@@ -56,7 +61,7 @@ int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
 }
 
 int main(int argc, char** argv) {
-	int buffd = shm_open(SHM_NAME, O_RDWR | O_CREAT, file_permissions);
+	int buffd = shm_open(SHM_NAME, O_RDWR, file_permissions);
 	if(buffd == -1) {
 		error("shm_open");
 		return EXIT_FAILURE;
