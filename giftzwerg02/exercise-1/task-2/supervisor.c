@@ -21,34 +21,19 @@ struct edge_buffer {
 	char* data[MAX_DATA];
 };
 
-char* s(char* str) {
-	size_t len = strlen(str);
-	char *ret = malloc(len + 1 + 1);
-	strcpy(ret, str);
-	ret[len] = newline;
-	ret[len + 1] = 0;
-	return ret;
-}
-
 void error(char *scope) {
-	perror(s(scope));
+	perror(scope);
 }
 
 char* read_solution(int *pos, struct edge_buffer *buf, sem_t *free, sem_t *used) {
-	printf("%s", s("trying to read"));
+	printf("trying to read\n");
 	sem_wait(used);
 	char *res = buf->data[*pos];
-	char *cpy = malloc(strlen(res) + 1);
-	strcpy(cpy, res);
-	cpy[strlen(res) + 1] = 0;
-
 	sem_post(free);
 	*pos += 1;
 	*pos %= sizeof(buf->data);
-	printf("%s", s("done reading"));
-
-
-	return cpy;
+	printf("done reading\n");
+	return res;
 }
 
 int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
@@ -81,7 +66,7 @@ int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
 }
 
 int main(int argc, char** argv) {
-	printf("%s", s("start supervisor"));
+	printf("start supervisor\n");
 	int buffd = shm_open(SHM_NAME, O_RDWR | O_CREAT, file_permissions);
 	if(buffd == -1) {
 		error("shm_open");
@@ -109,11 +94,11 @@ int main(int argc, char** argv) {
 	}
 
 
-	printf("%s", s("start reading"));
+	printf("start reading\n");
 	int pos = 0;
-	for(;;) {
+	while(0 == 0) {
 		char *val = read_solution(&pos, buffer, eb_free_sem, eb_used_sem);
-		printf(s("i just read: %s"), val);
+		printf("i just read: %s\n", val);
 	}
 
 	return cleanup(buffd, buffer, eb_free_sem, eb_used_sem);

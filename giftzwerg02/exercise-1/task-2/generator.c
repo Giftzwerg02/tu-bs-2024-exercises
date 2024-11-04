@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <stdbool.h>
 
 #define SHM_NAME "/edge-buffer"
 #define MAX_DATA (50)
@@ -21,27 +22,18 @@ struct edge_buffer {
 	char* data[MAX_DATA];
 };
 
-char* s(char* str) {
-	size_t len = strlen(str);
-	char *ret = malloc(len + 1 + 1);
-	strcpy(ret, str);
-	ret[len] = newline;
-	ret[len + 1] = 0;
-	return ret;
-}
-
 void write_solution(int *pos, struct edge_buffer *buf, char* val, sem_t *free, sem_t *used) {
-	printf("%s", s("Trying to write..."));
+	printf("Trying to write...\n");
 	sem_wait(free);
 	buf->data[*pos] = val;
 	sem_post(used);
 	*pos += 1;
 	*pos %= sizeof(buf->data);
-	printf("%s", s("done writing"));
+	printf("done writing\n");
 }
 
 void error(char* scope) {
-	perror(s(scope));
+	perror(scope);
 }
 
 int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
@@ -81,10 +73,10 @@ int main(int argc, char** argv) {
 	sem_t *eb_free_sem = sem_open(EB_FREE_SEM, O_CREAT, file_permissions, MAX_DATA);
 	sem_t *eb_used_sem = sem_open(EB_USED_SEM, O_CREAT, file_permissions, 0);
 
-	printf("%s", s("start writing"));
+	printf("start writing\n");
 	int pos = 0;
-	for(;;) {
-		char text = 'a' + pos;
+	while(0 == 0) {
+		char text = 'a';
 		write_solution(&pos, buffer, &text, eb_free_sem, eb_used_sem);
 		sleep(1);
 	}
