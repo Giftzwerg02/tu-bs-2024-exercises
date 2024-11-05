@@ -1,3 +1,4 @@
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -8,40 +9,19 @@
 #include <semaphore.h>
 #include <stdbool.h>
 
-#define SHM_NAME "/edge-buffer"
-#define MAX_DATA (50)
+#include "lib.h"
 
-const int file_permissions = 0600;
-const char newline = 10;
-
-#define EB_FREE_SEM "/sem-eb-free"
-#define EB_USED_SEM "/sem-eb-used"
-
-struct edge_buffer {
-	int state;
-	char* data[MAX_DATA];
-};
-
-void error(char* scope) {
-	perror(scope);
-}
-
-void write_solution(int *pos, struct edge_buffer *buf, char* val, sem_t *free, sem_t *used) {
-	printf("Trying to write...\n");
+void write_solution(graph_buffer *buf, graph* val, sem_t *free, sem_t *used, sem_t *mutex) {
+	sem_wait(mutex);
 	sem_wait(free);
-	printf("write to pos = %d\n", *pos);
-	buf->data[0] = "abc";
-	if(msync(buf, sizeof(struct edge_buffer), MS_SYNC) != 0) {
-		error("msync");
-	}
-	printf("i just wrote: %s\n", buf->data[*pos]);
+
+	push(buf, val);
+
 	sem_post(used);
-	*pos += 1;
-	*pos %= sizeof(buf->data);
-	printf("done writing\n");
+	sem_post(mutex);
 }
 
-int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
+int cleanup(int buffd, graph_buffer *buffer, sem_t *s1, sem_t *s2, sem_t *s3) {
 	if(munmap(buffer, sizeof(*buffer)) == -1) {
 		error("munmap");
 		return EXIT_FAILURE;
@@ -52,8 +32,13 @@ int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
 		return EXIT_FAILURE;
 	}
 
-	if(sem_close(s1) == -1 || sem_close(s2) == -1) {
+	if(sem_close(s1) == -1 || sem_close(s2) == -1 || sem_close(s3)) {
 		error("sem_close");
+		return EXIT_FAILURE;
+	}
+
+	if(sem_unlink(EB_MUTEX_SEM) == -1) {
+		error("sem_unlink");
 		return EXIT_FAILURE;
 	}
 	
@@ -61,30 +46,39 @@ int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
 }
 
 int main(int argc, char** argv) {
+	srand(time(NULL));
 	int buffd = shm_open(SHM_NAME, O_RDWR, file_permissions);
 	if(buffd == -1) {
 		error("shm_open");
 		return EXIT_FAILURE;
 	}
 
-
-	struct edge_buffer *buffer;
+	graph_buffer *buffer;
 	buffer = mmap(NULL, sizeof(*buffer), PROT_READ | PROT_WRITE, MAP_SHARED, buffd, 0);
 	if(buffer == MAP_FAILED) {
 		error("mmap");
 		return EXIT_FAILURE;
 	}
 
-	sem_t *eb_free_sem = sem_open(EB_FREE_SEM, O_CREAT, file_permissions, MAX_DATA);
+	sem_t *eb_free_sem = sem_open(EB_FREE_SEM, O_CREAT, file_permissions, MAX_BUFFER_SIZE);
 	sem_t *eb_used_sem = sem_open(EB_USED_SEM, O_CREAT, file_permissions, 0);
+	sem_t *eb_mutex_sem = sem_open(EB_MUTEX_SEM, O_CREAT, file_permissions, 1);
 
-	printf("start writing\n");
-	int pos = 0;
+	char **edges_str = argv;
+	edges_str++;
+
+	graph *g = parse_graph(edges_str, argc - 1);
+
+	debug("%s", "start writing\n");
+	int n = 0;
 	while(0 == 0) {
-		char text = 'a';
-		write_solution(&pos, buffer, &text, eb_free_sem, eb_used_sem);
-		sleep(1);
+		n++;
+		debug("generator iteration: %d", n);
+		color_graph(g);
+		debug_graph(g);
+		graph *rem = remove_eq_col_edges(g);
+		write_solution(buffer, rem, eb_free_sem, eb_used_sem, eb_mutex_sem);
 	}
 
-	return cleanup(buffd, buffer, eb_free_sem, eb_used_sem);
+	return cleanup(buffd, buffer, eb_free_sem, eb_used_sem, eb_mutex_sem);
 }

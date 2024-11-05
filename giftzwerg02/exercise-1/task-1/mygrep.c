@@ -22,7 +22,7 @@ char *strtolower(char *str) {
 }
 
 void print_usage(void) {
-  printf("Ayo bro you ain't using this shit right.\n");
+  printf("Usage:.\n");
   printf("mygrep [-i] [-o outfile] keyword [file...]\n");
   printf("Options:\n");
   printf("> -i (case insensitive)\n");
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
       print_usage();
       return EXIT_FAILURE;
     default:
-      printf("Holy shit something just got nuked. (char: %c)", c);
+      printf("Something went wrong. (char: %c)", c);
       assert(0);
       break;
     }

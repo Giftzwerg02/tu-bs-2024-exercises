@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -7,41 +8,19 @@
 #include <unistd.h>
 #include <semaphore.h>
 
-#define SHM_NAME "/edge-buffer"
-#define MAX_DATA (50)
+#include "lib.h"
 
-const int file_permissions = 0600;
-const char newline = 10;
-
-#define EB_FREE_SEM "/sem-eb-free"
-#define EB_USED_SEM "/sem-eb-used"
-
-struct edge_buffer {
-	int state;
-	char* data[MAX_DATA];
-};
-
-void error(char *scope) {
-	perror(scope);
-}
-
-char* read_solution(int *pos, struct edge_buffer *buf, sem_t *free, sem_t *used) {
-	printf("trying to read\n");
+graph read_solution(graph_buffer *buf, sem_t *free, sem_t *used) {
 	sem_wait(used);
-	printf("reading pos = %d\n", *pos);
-	if(msync(buf, sizeof(struct edge_buffer), MS_SYNC) != 0) {
-		error("msync");
-	}
-	char *res = buf->data[0];
-	// char *res = "a";
+
+	graph res = pop(buf);
+
 	sem_post(free);
-	*pos += 1;
-	*pos %= sizeof(buf->data);
-	printf("done reading\n");
+
 	return res;
 }
 
-int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
+int cleanup(int buffd, graph_buffer *buffer, sem_t *s1, sem_t *s2) {
 	if(munmap(buffer, sizeof(*buffer)) == -1) {
 		error("munmap");
 		return EXIT_FAILURE;
@@ -71,26 +50,46 @@ int cleanup(int buffd, struct edge_buffer *buffer, sem_t *s1, sem_t *s2) {
 }
 
 int main(int argc, char** argv) {
-	printf("start supervisor\n");
+	debug("%s", "start supervisor\n");
+
+	char c;
+	bool has_limit = false;
+	int limit;
+	while((c = getopt(argc, argv, "n:w:")) != -1) {
+		switch (c) {
+			case 'n':
+				has_limit = true;
+				limit = (int) strtol(optarg, NULL, 10);
+				debug("limit set: %d", limit);
+				break;
+			case 'w':
+				break;
+			case '?':
+				return EXIT_FAILURE;
+			default:
+				return EXIT_FAILURE;
+		}
+	}
+
 	int buffd = shm_open(SHM_NAME, O_RDWR | O_CREAT, file_permissions);
 	if(buffd == -1) {
 		error("shm_open");
 		return EXIT_FAILURE;
 	}
 
-	if(ftruncate(buffd, sizeof(struct edge_buffer)) < 0) {
+	if(ftruncate(buffd, sizeof(graph_buffer)) < 0) {
 		error("ftruncate");
 		return EXIT_FAILURE;
 	}
 
-	struct edge_buffer *buffer;
+	graph_buffer *buffer;
 	buffer = mmap(NULL, sizeof(*buffer), PROT_READ | PROT_WRITE, MAP_SHARED, buffd, 0);
 	if(buffer == MAP_FAILED) {
 		error("mmap");
 		return EXIT_FAILURE;
 	}
 
-	sem_t *eb_free_sem = sem_open(EB_FREE_SEM, O_CREAT, file_permissions, MAX_DATA);
+	sem_t *eb_free_sem = sem_open(EB_FREE_SEM, O_CREAT, file_permissions, MAX_BUFFER_SIZE);
 	sem_t *eb_used_sem = sem_open(EB_USED_SEM, O_CREAT, file_permissions, 0);
 
 	if(eb_free_sem == SEM_FAILED || eb_used_sem == SEM_FAILED) {
@@ -99,11 +98,26 @@ int main(int argc, char** argv) {
 	}
 
 
-	printf("start reading\n");
-	int pos = 0;
-	while(0 == 0) {
-		char *val = read_solution(&pos, buffer, eb_free_sem, eb_used_sem);
-		printf("i just read: %s\n", val);
+	debug("%s", "start reading\n");
+	int best_count = INT_MAX;
+	int n = 0;
+	while(!has_limit || n++ < limit) {
+		debug("supervisor iteration: %d", n);
+		graph val = read_solution(buffer, eb_free_sem, eb_used_sem);
+		debug_graph(&val);
+		if(val.count < best_count) {
+			best_count = val.count;
+			print_solution(&val, stdout);
+		}
+
+		if(best_count == 0) {
+			break;
+		}
+	}
+
+	if(best_count > 0) {
+		fprintf(stdout, "The graph might not be 3-colorable, best solution removes %d edges.\n", best_count);
+		fflush(stdout);
 	}
 
 	return cleanup(buffd, buffer, eb_free_sem, eb_used_sem);
