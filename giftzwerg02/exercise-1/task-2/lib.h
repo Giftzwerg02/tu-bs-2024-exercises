@@ -15,7 +15,7 @@
 
 #define SHM_NAME "/edge-buffer"
 #define MAX_DATA (500)
-#define MAX_BUFFER_SIZE (10)
+#define MAX_BUFFER_SIZE (50)
 
 extern const int file_permissions;
 
@@ -51,6 +51,7 @@ typedef struct {
 typedef struct {
 	int read_pos;
 	int write_pos;
+	bool stop_flag;
 	graph data[MAX_BUFFER_SIZE];
 } graph_buffer;
 
@@ -59,6 +60,7 @@ void error(char* scope);
 
 void push(graph_buffer* buf, graph* val);
 graph pop(graph_buffer* buf);
+void stop_generators(graph_buffer *buf);
 
 graph *parse_graph(char **edges_str, int edges_count);
 void debug_graph(graph *graph);

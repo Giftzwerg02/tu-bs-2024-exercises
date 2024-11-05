@@ -91,6 +91,10 @@ graph *remove_eq_col_edges(graph *g) {
 	return removed_graph;
 }
 
+void stop_generators(graph_buffer *buf) {
+	buf->stop_flag = true;
+}
+
 void print_solution(graph *g, FILE *fp) {
 	if(g->count == 0) {
 		fprintf(fp, "The graph is 3-colorable!\n");

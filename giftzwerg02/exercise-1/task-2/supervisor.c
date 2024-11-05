@@ -120,5 +120,7 @@ int main(int argc, char** argv) {
 		fflush(stdout);
 	}
 
+	buffer->stop_flag = true;		
+
 	return cleanup(buffd, buffer, eb_free_sem, eb_used_sem);
 }

@@ -74,6 +74,9 @@ int main(int argc, char** argv) {
 	while(0 == 0) {
 		n++;
 		debug("generator iteration: %d", n);
+		if(buffer->stop_flag) {
+			break;
+		}
 		color_graph(g);
 		debug_graph(g);
 		graph *rem = remove_eq_col_edges(g);
