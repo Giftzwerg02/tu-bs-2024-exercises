@@ -1,6 +1,6 @@
 #include "lib.h"
-#include "unistd.h"
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,14 +14,15 @@ graph_t parseargs(int argc, char **argv);
 
 col_t *coloring(int max_id);
 
-solution_t get_solution(graph_t *graph, col_t *cols);
+solution_t *get_solution(graph_t *graph, col_t *cols);
 
 void write_solution(circbuf_t *buf, solution_t sol, sem_t *sr, sem_t *sw,
                     sem_t *sx);
 
 int main(int argc, char **argv) {
   graph_t g = parseargs(argc, argv);
-  circbuf_t *buf = open_circbuf_shm();
+  int fd;
+  circbuf_t *buf = open_circbuf_shm(&fd);
 
   sem_t *sem_read = open_sem(SEM_NAME_READ);
   sem_t *sem_write = open_sem(SEM_NAME_WRITE);
@@ -29,10 +30,17 @@ int main(int argc, char **argv) {
 
   while (buf->stop != 1) {
     col_t *cols = coloring(g.max_id);
-    solution_t sol = get_solution(&g, cols);
-    write_solution(buf, sol, sem_read, sem_write, sem_xor);
-    sleep(1);
+    solution_t *sol = get_solution(&g, cols);
+    if(sol == NULL) {
+      continue;
+    }
+    write_solution(buf, *sol, sem_read, sem_write, sem_xor);
   }
+
+  close_circbuf_shm(fd, buf);
+  close_sem(sem_read);
+  close_sem(sem_write);
+  close_sem(sem_xor);
 
   exit(EXIT_SUCCESS);
 }
@@ -102,8 +110,9 @@ col_t *coloring(int max_id) {
   return cols;
 }
 
-solution_t get_solution(graph_t *graph, col_t *cols) {
-  solution_t sol = {};
+solution_t *get_solution(graph_t *graph, col_t *cols) {
+  solution_t *sol = malloc(sizeof(solution_t));
+  sol->count = 0;
 
   for (int i = 0; i < graph->count; i++) {
     edge_t gedge = graph->edges[i];
@@ -111,8 +120,12 @@ solution_t get_solution(graph_t *graph, col_t *cols) {
     col_t c2 = cols[gedge.n2];
 
     if (c1 == c2) {
-      sol.removed_edges[sol.count] = gedge;
-      sol.count++;
+      if(sol->count >= BUFENTRY_SIZE) {
+        return NULL; // too large solution
+      }
+
+      sol->removed_edges[sol->count] = gedge;
+      sol->count++;
     }
   }
 

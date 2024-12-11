@@ -40,10 +40,16 @@ typedef struct {
 solution_t read_circ(circbuf_t *cirbuf);
 void write_circ(circbuf_t *cirbuf, solution_t *data);
 
-circbuf_t *open_circbuf_shm();
-circbuf_t *create_circbuf_shm();
+circbuf_t *open_circbuf_shm(int *fd);
+circbuf_t *create_circbuf_shm(int *fd);
+void close_circbuf_shm(int fd, circbuf_t *buf);
+void unlink_circbuf_shm();
+
 sem_t *create_sem(char *name, int init_val);
 sem_t *open_sem(char *name);
+
+void close_sem(sem_t *sem);
+void unlink_sem(char *name);
 
 void usage(void);
 void err(char *msg);
