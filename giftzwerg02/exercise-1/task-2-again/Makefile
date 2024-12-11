@@ -1,21 +1,26 @@
-.PHONY: clean
+# Project: 3coloring
+# Author: Boris Dimov, 12220025
 
+PROGRAMS = supervisor generator
 CC = gcc
-CCFLAGS = -std=c99 -pedantic -Wall -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE -D_POSIC_C_SOURCE=200809L -g
-DEPS = lib.h
-OBJS = lib.o
+CFLAGS = -std=c99 -pedantic -Wall -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_SVID_SOURCE -D_POSIX_C_SOURCE=200809L -g
+LDFLAGS = -lm -pthread -lrt
+OBJECTS_ALL = $(patsubst %.c, %.o, $(wildcard *.c))
+OBJECTS = $(filter-out $(patsubst %,%.o,$(PROGRAMS)), $(OBJECTS_ALL))
 
-all: generator supervisor 
+all: $(OBJECTS) $(PROGRAMS)
 
-debug: CCFLAGS += -DDEBUG
-debug: all
+%.o: %.c $(wildcard *.h)
+	$(CC) $(CFLAGS) -c $< -o $@ $(LDFLAGS)
 
-%.o: %.c $(DEPS)
-	$(CC) $(CCFLAGS) -c $^ 
-
-supervisor: supervisor.o $(OBJS)
-
-generator: generator.o $(OBJS)
+$(PROGRAMS): %: %.o $(wildcard *.o)
+	$(CC) $(CFLAGS) -o $@ $< $(OBJECTS) $(LDFLAGS)
 
 clean:
-	rm -rf *.o generator supervisor
+	rm -vf $(wildcard *.o) $(PROGRAMS) $(wildcard *.txt)
+
+testcases: $(wildcard *.c) $(wildcard *.h) all
+	./tests.sh;
+
+docs: $(wildcard *.c) $(wildcard *.h)
+	doxygen

@@ -14,7 +14,7 @@
 #include "lib.h"
 
 typedef struct {
-  int *limit;
+  int limit;
   int delay;
 } arguments_t;
 
@@ -28,7 +28,6 @@ int stop_sup;
 void argparse(int argc, char **argv, arguments_t *arguments);
 
 void shutdown() {
-  printf("Shutting down...\n");
   buf->stop = 1; 
   close_circbuf_shm(fd, buf);
   unlink_circbuf_shm();
@@ -41,22 +40,13 @@ void shutdown() {
 }
 
 void sighandler(int signal) { 
-  printf("sighandler\n");
   stop_sup = 1;
-}
-
-int loop_limit(int *l) {
-  if(l == NULL) {
-    return 1;
-  }
-  *l -= 1;
-  return *l;
 }
 
 int main(int argc, char **argv) {
   arguments_t args = {
       // set defaults
-      .limit = NULL,
+      .limit = -1,
       .delay = 0,
   };
 
@@ -75,7 +65,10 @@ int main(int argc, char **argv) {
 
   sleep(args.delay);
 
-  while (loop_limit(args.limit) && stop_sup != 1) {
+  while (args.limit != 0 && stop_sup != 1) {
+    if(args.limit != -1) {
+      args.limit--;
+    }
     sem_wait(sem_read);
 
     solution_t sol = read_circ(buf);
@@ -84,9 +77,6 @@ int main(int argc, char **argv) {
 
     if (sol.count < bestsol) {
       bestsol = sol.count;
-      printf("Solution with %d edges:", sol.count);
-      print_edges(sol.removed_edges, sol.count);
-      printf("\n");
     }
 
     if(bestsol == 0) {
@@ -97,7 +87,7 @@ int main(int argc, char **argv) {
   if(bestsol == 0) {
     printf("The graph is 3-colorable!\n");
   } else {
-    printf("The graph might not be 3-colorable, best solutino removes %d edges.\n", bestsol);
+    printf("The graph might not be 3-colorable, best solution removes %d edges.\n", bestsol);
   }
 
   shutdown();
@@ -119,7 +109,7 @@ void argparse(int argc, char **argv, arguments_t *arguments) {
       if (l < 0) {
         usage();
       }
-      arguments->limit = &l;
+      arguments->limit = l;
       break;
     case 'w':
       if (opt_w != 0) {

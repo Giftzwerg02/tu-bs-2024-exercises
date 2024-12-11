@@ -31,10 +31,13 @@ int main(int argc, char **argv) {
   while (buf->stop != 1) {
     col_t *cols = coloring(g.max_id);
     solution_t *sol = get_solution(&g, cols);
+    free(cols);
     if(sol == NULL) {
       continue;
     }
+    printf("writing...\n");
     write_solution(buf, *sol, sem_read, sem_write, sem_xor);
+    free(sol);
   }
 
   close_circbuf_shm(fd, buf);
@@ -121,6 +124,7 @@ solution_t *get_solution(graph_t *graph, col_t *cols) {
 
     if (c1 == c2) {
       if(sol->count >= BUFENTRY_SIZE) {
+        free(sol);
         return NULL; // too large solution
       }
 
