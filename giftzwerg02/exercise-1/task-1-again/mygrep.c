@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,18 +17,54 @@ args_t args = {
 
 void parseargs(int argc, char **argv, args_t *args);
 void usage();
+void err(char *msg);
+void print_matches(FILE *fp, char *keyword, int insensitive, FILE *out);
+char *strtolower(char *str);
+void exec(FILE *fp, char* keyword, int insensitive, FILE *out);
 
 int main(int argc, char **argv) {
   parseargs(argc, argv, &args);
-  if(optind >= argc+1) {
+  if(argc < 2 || optind >= argc) {
     usage();
   }
-  char *keyword = argv[optind];
-  for(int i = optind + 1; i < argc; i++) {
-    char *filename = argv[i];
 
+  FILE *out = stdout;
+  if(args.outfile != NULL) {
+    out = fopen(args.outfile, "w");
+    if(out == NULL) {
+      err("fopen");
+    }
+  }
+
+  char *keyword = argv[optind];
+  if(optind + 1 == argc) {
+      exec(stdin, keyword, args.insensitive, out);
+  } else {
+    for(int i = optind + 1; i < argc; i++) {
+      char *filename = argv[i];
+      FILE *fp = fopen(filename, "r");
+      exec(fp, keyword, args.insensitive, out);
+    }
+  }
+
+  if(args.outfile != NULL) {
+    if(fclose(out) == EOF) {
+      err("fclose");
+    }
   }
   exit(EXIT_SUCCESS);
+}
+
+void exec(FILE *fp, char* keyword, int insensitive, FILE *out) {
+    if(fp == NULL) {
+      err("fopen");
+    }
+
+    print_matches(fp, keyword, insensitive, out);
+
+    if(fclose(fp) == EOF) {
+      err("fclose");
+    }
 }
 
 void parseargs(int argc, char **argv, args_t *args) {
@@ -66,4 +103,35 @@ void usage() {
 void err(char *msg) {
   perror(msg);
   exit(EXIT_FAILURE);
+}
+
+void print_matches(FILE *fp, char *keyword, int insensitive, FILE *out) {
+  char buf[8192];
+  while(fgets(buf, sizeof(buf), fp) != NULL) {
+    if(insensitive == 1) {
+      char *ik = strtolower(keyword);
+      char *ib = strtolower(buf);
+      if(strstr(ib, ik) != NULL) {
+        if(fputs(buf, out) == EOF) {
+          err("fputs");
+        }
+      }
+    } else {
+      if(strstr(buf, keyword) != NULL) {
+        if(fputs(buf, out) == EOF) {
+          err("fputs");
+        }
+      }
+    }
+  }
+}
+
+char *strtolower(char *str) {
+  int size = strlen(str);
+  char *ret = malloc(size + 1);
+  for(int i = 0; i < size; i++) {
+    ret[i] = tolower(str[i]);
+  }
+  ret[size] = '\0';
+  return ret;
 }
